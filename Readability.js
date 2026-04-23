@@ -49,6 +49,7 @@ function Readability(doc, options) {
   this._attempts = [];
   this._metadata = {};
   this.parse = this.parse.bind(this);
+  this._grabArticle = this._grabArticle.bind(this);
 
   // Configurable options
   this._debug = !!options.debug;
