@@ -56,6 +56,7 @@ function Readability(doc, options) {
     options.classesToPreserve || []
   );
   this._keepClasses = !!options.keepClasses;
+  this._keepAllContent = !!options.keepAllContent;
   this._serializer =
     options.serializer ||
     function (el) {
@@ -2658,6 +2659,81 @@ Readability.prototype = {
   },
 
   /**
+   * Clean out elements that match the specified conditions
+   *
+   * @param Element
+   * @param Function determines whether a node should be removed
+   * @return void
+   **/
+  _cleanMatchedNodes(e, filter) {
+    var endOfSearchMarkerNode = this._getNextNode(e, true);
+    var next = this._getNextNode(e);
+    while (next && next != endOfSearchMarkerNode) {
+      if (filter.call(this, next, next.className + " " + next.id)) {
+        next = this._removeAndGetNext(next);
+      } else {
+        next = this._getNextNode(next);
+      }
+    }
+  },
+
+  /**
+   * Clean out spurious headers from an Element.
+   *
+   * @param Element
+   * @return void
+   **/
+  _cleanHeaders(e) {
+    let headingNodes = this._getAllNodesWithTag(e, ["h1", "h2"]);
+    this._removeNodes(headingNodes, function (node) {
+      let shouldRemove = this._getClassWeight(node) < 0;
+      if (shouldRemove) {
+        this.log("Removing header with low class weight:", node);
+      }
+      return shouldRemove;
+    });
+  },
+
+  /**
+   * Check if this node is an H1 or H2 element whose content is mostly
+   * the same as the article title.
+   *
+   * @param Element  the node to check.
+   * @return boolean indicating whether this is a title-like header.
+   */
+  _headerDuplicatesTitle(node) {
+    if (node.tagName != "H1" && node.tagName != "H2") {
+      return false;
+    }
+    var heading = this._getInnerText(node, false);
+    this.log("Evaluating similarity of header:", heading, this._articleTitle);
+    return this._textSimilarity(this._articleTitle, heading) > 0.75;
+  },
+
+  _flagIsActive(flag) {
+    return (this._flags & flag) > 0;
+  },
+
+  _removeFlag(flag) {
+    this._flags = this._flags & ~flag;
+  },
+
+  _isProbablyVisible(node) {
+    // Have to null-check node.style and node.className.includes to deal with SVG and MathML nodes.
+    return (
+      (!node.style || node.style.display != "none") &&
+      (!node.style || node.style.visibility != "hidden") &&
+      !node.hasAttribute("hidden") &&
+      //check for "fallback-image" so that wikimedia math images are displayed
+      (!node.hasAttribute("aria-hidden") ||
+        node.getAttribute("aria-hidden") != "true" ||
+        (node.className &&
+          node.className.includes &&
+          node.className.includes("fallback-image")))
+    );
+  },
+
+  /**
    * Runs readability.
    *
    * Workflow:
@@ -2678,6 +2754,34 @@ Readability.prototype = {
           "Aborting parsing document; " + numTags + " elements found"
         );
       }
+    }
+
+    // Return the full original document HTML when requested.
+    if (this._keepAllContent) {
+      var jsonLd = this._disableJSONLD ? {} : this._getJSONLD(this._doc);
+      var metadata = this._getArticleMetadata(jsonLd);
+      this._metadata = metadata;
+      this._articleTitle = metadata.title;
+
+      var contentHtml = this._doc.documentElement
+        ? this._doc.documentElement.outerHTML
+        : this._doc.documentElement;
+      var textContent = this._doc.documentElement
+        ? this._doc.documentElement.textContent || ""
+        : "";
+
+      return {
+        title: this._articleTitle,
+        byline: metadata.byline || this._articleByline,
+        dir: this._articleDir,
+        lang: this._articleLang,
+        content: contentHtml,
+        textContent,
+        length: textContent.length,
+        excerpt: metadata.excerpt,
+        siteName: metadata.siteName || this._articleSiteName,
+        publishedTime: metadata.publishedTime,
+      };
     }
 
     // Unwrap image from noscript
