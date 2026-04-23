@@ -25,6 +25,10 @@
  * @param {Object}       options The options object.
  */
 function Readability(doc, options) {
+  if (!(this instanceof Readability)) {
+    return new Readability(doc, options);
+  }
+
   // In some older versions, people passed a URI as the first argument. Cope:
   if (options && options.documentElement) {
     doc = options;
@@ -44,6 +48,7 @@ function Readability(doc, options) {
   this._articleSiteName = null;
   this._attempts = [];
   this._metadata = {};
+  this.parse = this.parse.bind(this);
 
   // Configurable options
   this._debug = !!options.debug;
@@ -56,7 +61,7 @@ function Readability(doc, options) {
     options.classesToPreserve || []
   );
   this._keepClasses = !!options.keepClasses;
-  this._keepAllContent = !!options.keepAllContent;
+  this._keepAllContent = !!options.keepAllContent || !!options.keepContent;
   this._serializer =
     options.serializer ||
     function (el) {
