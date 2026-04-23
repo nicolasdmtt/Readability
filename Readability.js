@@ -61,7 +61,16 @@ function Readability(doc, options) {
     options.classesToPreserve || []
   );
   this._keepClasses = !!options.keepClasses;
-  this._keepAllContent = !!options.keepAllContent || !!options.keepContent;
+  this._keepAllContent = !!(
+    options.keepAllContent ||
+    options.keepContent ||
+    options.keep_all_content ||
+    options.keep_content ||
+    options.fullContent ||
+    options.fullHtml ||
+    options.fullHTML ||
+    options.full_content
+  );
   this._serializer =
     options.serializer ||
     function (el) {
@@ -2843,4 +2852,10 @@ if (typeof module === "object") {
   /* eslint-disable-next-line no-redeclare */
   /* global module */
   module.exports = Readability;
+}
+
+if (typeof Readability !== "undefined") {
+  Readability.parse = function (doc, options) {
+    return new Readability(doc, options).parse();
+  };
 }
